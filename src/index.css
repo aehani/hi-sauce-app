@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=Work+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --red: #E8341C;
+  --red-dim: rgba(232, 52, 28, 0.15);
+}
+
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'DM Sans', sans-serif;
+}
+
+body { background: #0A0A0A; color: white; }
+.font-display { font-family: 'Syne', sans-serif; }
+
+.bubble { position: absolute; border-radius: 50%; cursor: pointer; transform-origin: center; will-change: transform; user-select: none; }
+.bubble-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: radial-gradient(ellipse at 35% 35%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.04) 60%, rgba(255,255,255,0.08) 100%);
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: inset 0 2px 12px rgba(255,255,255,0.25), inset 0 -4px 20px rgba(232,52,28,0.08), 0 8px 32px rgba(0,0,0,0.4);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; transition: transform 0.15s ease;
+}
+.bubble-inner::before {
+  content: ''; position: absolute; top: 10%; left: 20%; width: 40%; height: 25%;
+  background: rgba(255,255,255,0.5); border-radius: 50%; filter: blur(6px); transform: rotate(-20deg);
+}
+.bubble-inner::after {
+  content: ''; position: absolute; bottom: 15%; right: 20%; width: 20%; height: 12%;
+  background: rgba(255,255,255,0.2); border-radius: 50%; filter: blur(4px);
+}
+.bubble:hover .bubble-inner { transform: scale(1.07); }
+
+@keyframes bubblePop {
+  0%   { transform: scale(1);    opacity: 1; }
+  25%  { transform: scale(1.2);  opacity: 0.9; }
+  65%  { transform: scale(0.2);  opacity: 0.3; }
+  100% { transform: scale(0);    opacity: 0; }
+}
+.bubble.popping .bubble-inner { animation: bubblePop 0.42s cubic-bezier(0.36, 0, 0.66, -0.56) forwards; pointer-events: none; }
+
+@keyframes rippleOut {
+  0%   { transform: scale(0.3); opacity: 0.7; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.pop-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); animation: rippleOut 0.5s ease-out forwards; pointer-events: none; }
+
+@keyframes floatA { 0%,100%{transform:translate(0,0)} 25%{transform:translate(8px,-14px)} 50%{transform:translate(-6px,-22px)} 75%{transform:translate(-11px,-9px)} }
+@keyframes floatB { 0%,100%{transform:translate(0,0)} 33%{transform:translate(-13px,-16px)} 66%{transform:translate(11px,-24px)} }
+@keyframes floatC { 0%,100%{transform:translate(0,0)} 40%{transform:translate(15px,-11px)} 70%{transform:translate(-9px,-19px)} }
+@keyframes floatD { 0%,100%{transform:translate(0,0)} 30%{transform:translate(-7px,-15px)} 60%{transform:translate(13px,-9px)} }
+
+.float-a { animation: floatA 6s ease-in-out infinite; }
+.float-b { animation: floatB 7.5s ease-in-out infinite; }
+.float-c { animation: floatC 5.5s ease-in-out infinite; }
+.float-d { animation: floatD 8s ease-in-out infinite; }
+
+.passcode-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3); background: transparent; transition: all 0.2s ease;
+}
+.passcode-dot.filled { background: #E8341C; border-color: #E8341C; box-shadow: 0 0 10px rgba(232,52,28,0.5); }
+
+@keyframes shake {
+  0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
+}
+.shake { animation: shake 0.4s ease; }
+
+.keypad-btn {
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 50%;
+  width: 72px; height: 72px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: white;
+  transition: all 0.15s ease; backdrop-filter: blur(10px); user-select: none;
+}
+.keypad-btn:hover { background: rgba(255,255,255,0.13); transform: scale(1.05); }
+.keypad-btn:active { transform: scale(0.92); background: rgba(232,52,28,0.25); }
+
+@keyframes pageSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter { animation: pageSlideUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+.noise {
+  position: fixed; inset: 0; pointer-events: none; z-index: 99; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}

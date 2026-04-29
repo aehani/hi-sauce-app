@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head><style>
+body { background: #060606; margin: 20px; font-family: sans-serif; }
+h2 { color: white; }
+.row { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.box { width: 300px; height: 300px; border: 1px solid #333; position: relative; flex-shrink: 0; }
+img { width: 100%; height: 100%; object-fit: contain; display: block; }
+label { color: #aaa; font-size: 12px; display: block; margin-bottom: 4px; }
+</style></head>
+<body>
+  <h2>Blend mode test — which one shows the splash?</h2>
+  <div class="row">
+    <div>
+      <label>normal (no blend)</label>
+      <div class="box"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:normal" /></div>
+    </div>
+    <div>
+      <label>screen</label>
+      <div class="box"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:screen" /></div>
+    </div>
+    <div>
+      <label>lighten</label>
+      <div class="box"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:lighten" /></div>
+    </div>
+    <div>
+      <label>color-dodge</label>
+      <div class="box"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:color-dodge" /></div>
+    </div>
+    <div>
+      <label>screen on white bg</label>
+      <div class="box" style="background:white"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:screen" /></div>
+    </div>
+    <div>
+      <label>normal on white bg</label>
+      <div class="box" style="background:white"><img src="/assets/splashes/buffalo.png" style="mix-blend-mode:normal" /></div>
+    </div>
+  </div>
+  <p id="res" style="color:yellow">Fetching...</p>
+  <script>
+    fetch('/assets/splashes/buffalo.png').then(r => {
+      document.getElementById('res').textContent = 'HTTP ' + r.status + ' | type: ' + r.headers.get('content-type') + ' | size: ' + r.headers.get('content-length') + ' bytes'
+    })
+  </script>
+</body>
+</html>

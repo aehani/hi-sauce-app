@@ -58,9 +58,11 @@ exports.handler = async (event) => {
     if (data.messages?.resultCode === 'Error') throw new Error(data.messages?.message?.[0]?.text || 'Authorize.net error')
     if (!data.token) throw new Error('No token returned from Authorize.net')
 
+    // Encode the token — it contains +, /, = which must be URL-encoded
+    const encodedToken = encodeURIComponent(data.token)
     const paymentUrl = IS_SANDBOX
-      ? `https://test.authorize.net/payment/payment?token=${data.token}`
-      : `https://accept.authorize.net/payment/payment?token=${data.token}`
+      ? `https://test.authorize.net/payment/payment?token=${encodedToken}`
+      : `https://accept.authorize.net/payment/payment?token=${encodedToken}`
 
     return { statusCode: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: data.token, paymentUrl, orderId }) }
   } catch (err) {

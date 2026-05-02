@@ -20,6 +20,8 @@ export default function OrderTab({ staff }) {
   const [orderId]                   = useState(genOrderId)
   const [paymentUrl, setPaymentUrl] = useState(null)
   const [payStatus, setPayStatus]   = useState('idle')
+  const [emailSent, setEmailSent]   = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
   const cleanupRef                  = useRef(null)
 
   useEffect(() => () => cleanupRef.current?.(), [])
@@ -40,6 +42,32 @@ export default function OrderTab({ staff }) {
 
   const subtotal  = cartItems.reduce((s, i) => s + i.price * i.qty, 0)
   const infoValid = buyer.store && buyer.name && buyer.email
+
+  const sendPaymentEmail = async () => {
+    setEmailSending(true)
+    try {
+      const res = await fetch('/.netlify/functions/send-payment-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyerEmail:  buyer.email,
+          buyerName:   buyer.name,
+          storeName:   buyer.store,
+          orderId,
+          amount:      subtotal,
+          paymentUrl,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      setEmailSent(true)
+    } catch (err) {
+      console.error('Email send error:', err)
+      alert('Failed to send email: ' + err.message)
+    } finally {
+      setEmailSending(false)
+    }
+  }
 
   const startPolling = (oid) => {
     const unsub = subscribeToPayment(oid, () => { setPayStatus('paid'); cleanupRef.current?.() })
@@ -78,7 +106,7 @@ export default function OrderTab({ staff }) {
   const reset = () => {
     cleanupRef.current?.()
     setCart({}); setBuyer({ store:'', name:'', email:'', phone:'', address:'', city:'', state:'', zip:'', fulfillment:'ship' })
-    setPayMethod(null); setStep('build'); setError(null); setPaymentUrl(null); setPayStatus('idle')
+    setPayMethod(null); setStep('build'); setError(null); setPaymentUrl(null); setPayStatus('idle'); setEmailSent(false); setEmailSending(false)
   }
 
   // WAITING
@@ -101,12 +129,27 @@ export default function OrderTab({ staff }) {
           <h2 style={{ ...hdg, fontSize:28, marginBottom:8 }}>Waiting for Payment</h2>
           <p style={{ color:'rgba(255,255,255,0.45)', fontSize:14, marginBottom:24, fontFamily:'Work Sans, sans-serif' }}>Send the link to <strong style={{color:'#fff'}}>{buyer.name}</strong></p>
           <div style={{ width:'100%', maxWidth:380, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:16, padding:20, marginBottom:20 }}>
-            <p style={{...lbl, marginBottom:10}}>Payment Link — {fmt(subtotal)}</p>
-            <div style={{ background:'rgba(0,0,0,0.4)', borderRadius:10, padding:'10px 14px', marginBottom:14, wordBreak:'break-all', fontSize:11, color:'rgba(255,255,255,0.5)', fontFamily:'monospace' }}>{paymentUrl}</div>
+            <p style={{...lbl, marginBottom:14}}>Payment Link — {fmt(subtotal)}</p>
+
+            {/* Open in browser — primary action */}
+            <button
+              onClick={() => window.open(paymentUrl, '_blank')}
+              style={{ width:'100%', padding:'14px', background:'#E8341C', border:'none', borderRadius:12, color:'#fff', fontSize:14, fontWeight:900, cursor:'pointer', fontFamily:'Impact, sans-serif', letterSpacing:'0.06em', marginBottom:10 }}
+            >🔗 OPEN PAYMENT PAGE</button>
+
+            {/* Send options */}
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => navigator.clipboard.writeText(paymentUrl)} style={{ flex:1, padding:12, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Work Sans, sans-serif' }}>📋 Copy</button>
-              {buyer.email && <button onClick={() => window.open(`mailto:${buyer.email}?subject=Hi! Sauce Payment ${fmt(subtotal)}&body=Hi ${buyer.name},%0D%0A%0D%0APlease complete your payment here:%0D%0A${paymentUrl}`, '_blank')} style={{ flex:1, padding:12, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Work Sans, sans-serif' }}>✉️ Email</button>}
-              {buyer.phone && <button onClick={() => window.open(`sms:${buyer.phone}?body=Hi ${buyer.name}! Complete your Hi! Sauce payment of ${fmt(subtotal)}: ${paymentUrl}`, '_blank')} style={{ flex:1, padding:12, background:'rgba(232,52,28,0.15)', border:'1px solid rgba(232,52,28,0.4)', borderRadius:10, color:'#E8341C', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'Work Sans, sans-serif' }}>💬 SMS</button>}
+              <button onClick={() => navigator.clipboard.writeText(paymentUrl)} style={{ flex:1, padding:11, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Work Sans, sans-serif' }}>📋 Copy</button>
+              {buyer.email && (
+                <button
+                  onClick={sendPaymentEmail}
+                  disabled={emailSending || emailSent}
+                  style={{ flex:1, padding:11, background: emailSent ? 'rgba(39,201,106,0.15)' : 'rgba(255,255,255,0.08)', border: `1px solid ${emailSent ? 'rgba(39,201,106,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius:10, color: emailSent ? '#27C96A' : '#fff', fontSize:11, fontWeight:700, cursor: emailSent || emailSending ? 'default' : 'pointer', fontFamily:'Work Sans, sans-serif', opacity: emailSending ? 0.6 : 1 }}
+                >
+                  {emailSending ? '...' : emailSent ? '✓ Sent!' : '✉️ Email'}
+                </button>
+              )}
+              {buyer.phone && <button onClick={() => window.open(`sms:${buyer.phone}?body=Hi ${buyer.name}! Complete your Hi! Sauce payment of ${fmt(subtotal)}: ${paymentUrl}`, '_blank')} style={{ flex:1, padding:11, background:'rgba(232,52,28,0.15)', border:'1px solid rgba(232,52,28,0.4)', borderRadius:10, color:'#E8341C', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'Work Sans, sans-serif' }}>💬 SMS</button>}
             </div>
           </div>
           <p style={{ color:'rgba(255,255,255,0.2)', fontSize:12, fontFamily:'Work Sans, sans-serif', marginBottom:20 }}>Screen updates automatically when payment is received</p>

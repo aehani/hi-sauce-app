@@ -1,7 +1,6 @@
 import { Suspense, useRef, useEffect, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Environment, Float } from '@react-three/drei'
-import { motion, AnimatePresence } from 'framer-motion'
 import * as THREE from 'three'
 
 function TransparentBackground() {
@@ -63,20 +62,16 @@ function BottleModel({ glbPath }) {
 function SachetModel({ glbPath }) {
   const { scene } = useGLTF(glbPath)
   const spinRef = useRef()
-
   useEffect(() => {
     if (!scene) return
-    // Same approach as working BottleModal: fitByHeight + scene.rotation.set(0, PI/2, 0)
     fitByHeight(scene, 2.2)
     scene.rotation.set(0, Math.PI / 2, 0)
   }, [scene])
-
   useFrame((state) => {
     if (spinRef.current) {
       spinRef.current.rotation.y = state.clock.elapsedTime * 0.35
     }
   })
-
   return (
     <Float speed={1.4} floatIntensity={0.2} rotationIntensity={0}>
       <group ref={spinRef}>
@@ -86,8 +81,8 @@ function SachetModel({ glbPath }) {
   )
 }
 
-// Single shared scene — swaps content based on activeTab
-// ONE Canvas, no context switching, no context loss
+// Visibility toggle — keeps both models mounted, just hides the inactive one
+// This avoids destroying/recreating GPU resources when switching tabs
 function SceneContent({ sauce, activeTab }) {
   return (
     <>
@@ -99,29 +94,42 @@ function SceneContent({ sauce, activeTab }) {
       <pointLight position={[0, 4, 0]} intensity={1.0} />
       <Environment preset="studio" />
       <Suspense fallback={null}>
-        {activeTab === 'bottle'
-          ? <BottleModel glbPath={sauce.glb} />
-          : <SachetModel glbPath={sauce.sachetGlb} />
-        }
+        {/* Keep both mounted — just toggle visibility to avoid GPU context churn on iPad */}
+        <group visible={activeTab === 'bottle'}>
+          <BottleModel glbPath={sauce.glb} />
+        </group>
+        <group visible={activeTab === 'sachet'}>
+          {sauce.sachetGlb && <SachetModel glbPath={sauce.sachetGlb} />}
+        </group>
       </Suspense>
     </>
   )
 }
 
 export default function BottleViewer({ sauce, onClick, activeTab = 'bottle' }) {
-  // activeTab is now controlled by parent (SauceTab) — no internal state needed
-  // The toggle lives in SauceTab so one pill controls both the 3D view and the info cards
-
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', background: 'transparent', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Single Canvas — no tab switching = no context loss */}
+      {/* Single persistent Canvas — never unmounts, never recreates WebGL context */}
       <div style={{ flex: 1, position: 'relative', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
         <Canvas
           camera={{ position: [0, 0.1, 4.2], fov: 42 }}
-          gl={{ antialias: true, alpha: true, premultipliedAlpha: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
-          dpr={[1, 2]}
+          gl={{
+            antialias: true,
+            alpha: true,
+            premultipliedAlpha: false,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.2,
+            // iPad-safe settings — reduce memory pressure
+            powerPreference: 'low-power',
+            failIfMajorPerformanceCaveat: false,
+          }}
+          dpr={Math.min(window.devicePixelRatio, 1.5)} // Cap at 1.5 for iPad — 2x causes OOM
           style={{ width: '100%', height: '100%', background: 'transparent' }}
+          onCreated={({ gl }) => {
+            // Tell the browser this canvas can be discarded under memory pressure
+            gl.getContext().canvas.style.willChange = 'auto'
+          }}
         >
           <SceneContent sauce={sauce} activeTab={activeTab} />
         </Canvas>
@@ -140,6 +148,7 @@ export default function BottleViewer({ sauce, onClick, activeTab = 'bottle' }) {
   )
 }
 
+// Preload all GLBs upfront so switching is instant and doesn't spike memory
 useGLTF.preload('/assets/bottles/buffalo.glb')
 useGLTF.preload('/assets/bottles/bbq.glb')
 useGLTF.preload('/assets/bottles/burn.glb')

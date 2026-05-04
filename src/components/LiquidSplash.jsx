@@ -47,30 +47,64 @@ export default function LiquidSplash({ src, style = {} }) {
         uniform vec2 u_center;
         varying vec2 vUv;
 
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          float a = hash(i);
+          float b = hash(i + vec2(1.0, 0.0));
+          float c = hash(i + vec2(0.0, 1.0));
+          float d = hash(i + vec2(1.0, 1.0));
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(a, b, u.x) +
+                 (c - a) * u.y * (1.0 - u.x) +
+                 (d - b) * u.x * u.y;
+        }
+
         void main() {
           vec2 uv = vUv;
           vec2 dir = uv - u_center;
           float dist = length(dir);
+          float t = u_time;
 
-          // Outward ripple wave — sauce spreading from center
-          float frequency = 18.0;
-          float speed = 2.2;
-          float amplitude = 0.018;
-          // Fade ripple near edges and center
-          float falloff = smoothstep(0.0, 0.08, dist) * smoothstep(0.8, 0.4, dist);
-          float ripple = sin(dist * frequency - u_time * speed) * falloff;
-          uv += normalize(dir) * ripple * amplitude;
+          // Viscosity — slows expansion over time so it settles naturally
+          float drag = 2.5;
+          float expansion = t / (1.0 + drag * t);
 
-          // Secondary slower wobble — gives organic sloshing feel
-          float wobbleFreq = 8.0;
-          float wobbleAmp = 0.008;
-          uv.x += sin(uv.y * wobbleFreq + u_time * 1.4) * wobbleAmp;
-          uv.y += cos(uv.x * wobbleFreq - u_time * 1.1) * wobbleAmp;
+          // Base radius growth
+          float radius = expansion * 0.6;
+
+          // Edge breakup — irregular splatter shape using noise
+          float n = noise(uv * 12.0 + t * 2.0);
+          float edge = radius + (n - 0.5) * 0.08;
+
+          // Splat mask — blob shape
+          float mask = smoothstep(edge, edge - 0.02, dist);
+
+          // Radial push — main splat motion outward
+          float push = (radius - dist) * mask;
+
+          // Thick center — viscosity feel
+          float thickness = smoothstep(0.0, 0.3, radius - dist);
+
+          // UV distortion from splat push
+          uv += normalize(dir) * push * 0.25;
+
+          // Subtle micro drips at edges
+          float drip = noise(uv * 40.0) * 0.01 * thickness;
+          uv += dir * drip;
 
           vec4 color = texture2D(u_texture, uv);
 
-          // Boost brightness of the sauce color slightly
-          color.rgb *= 1.15;
+          // Sauce gloss — fake specular highlight at center
+          float highlight = pow(thickness, 2.0) * 0.25;
+          color.rgb += highlight;
+
+          // Edge darkening — depth illusion
+          color.rgb *= mix(0.85, 1.0, thickness);
 
           gl_FragColor = color;
         }
@@ -112,9 +146,6 @@ export default function LiquidSplash({ src, style = {} }) {
   }, [src])
 
   return (
-    <div
-      ref={mountRef}
-      style={{ width: '100%', height: '100%', ...style }}
-    />
+    <div ref={mountRef} style={{ width: '100%', height: '100%', ...style }} />
   )
 }

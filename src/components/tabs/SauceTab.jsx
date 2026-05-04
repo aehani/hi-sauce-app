@@ -89,6 +89,7 @@ export default function SauceTab() {
   const [current, setCurrent]       = useState(0)
   const [dir, setDir]               = useState(1)
   const [modalSauce, setModalSauce] = useState(null)
+  const [activeView, setActiveView] = useState('bottle')
   const touchStart = useRef(0)
   const sauce = SAUCES[current]
   const splashSrc = SPLASH_MAP[sauce.id]
@@ -162,13 +163,28 @@ export default function SauceTab() {
                 <BottleViewer sauce={sauce} onClick={() => setModalSauce(sauce)} />
               </div>
               <Chip label="THC / SERVE" value={sauce.thc} color={sauce.accent} style={{ position: 'absolute', top: 14, left: 14, zIndex: 10 }} />
-              <Chip label="FORMAT" value={sauce.format} color="rgba(255,255,255,0.82)" style={{ position: 'absolute', top: 14, right: 14, zIndex: 10 }} />
+              {/* Bottle / Sachet tab switcher */}
+              <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, display: 'flex', gap: 3, background: 'rgba(6,6,6,0.78)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: 3, backdropFilter: 'blur(12px)' }}>
+                {[{ id: 'bottle', label: '🍶 Bottle' }, { id: 'sachet', label: '📦 Sachet' }].map(v => (
+                  <button key={v.id} onClick={(e) => { e.stopPropagation(); setActiveView(v.id) }}
+                    style={{ padding: '5px 11px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'Work Sans, sans-serif', transition: 'all 0.2s',
+                      background: activeView === v.id ? sauce.accent : 'transparent',
+                      color: activeView === v.id ? '#fff' : 'rgba(255,255,255,0.38)',
+                      boxShadow: activeView === v.id ? `0 0 10px ${sauce.accent}55` : 'none',
+                    }}>{v.label}</button>
+                ))}
+              </div>
               <div style={{ position: 'absolute', bottom: 14, left: 14, zIndex: 10, background: 'rgba(6,6,6,0.82)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 14, backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 14px rgba(0,0,0,0.55)', padding: '9px 13px' }}>
                 <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.14em', marginBottom: 5 }}>HEAT</div>
                 <HeatDots level={sauce.heat} accent={sauce.accent} />
                 <div style={{ fontSize: 11, fontWeight: 700, color: sauce.accent, marginTop: 4, fontFamily: 'Work Sans, sans-serif', letterSpacing: '0.04em' }}>{sauce.heatLabel}</div>
               </div>
-              <Chip label="MARGIN" value="40%" color="#27C96A" style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10 }} />
+              <Chip
+                label={activeView === 'bottle' ? 'FORMAT' : 'SIZE'}
+                value={activeView === 'bottle' ? sauce.format : (sauce.sachetFormat || '0.3 fl oz')}
+                color="rgba(255,255,255,0.82)"
+                style={{ position: 'absolute', bottom: 14, right: 14, zIndex: 10 }}
+              />
             </div>
 
             {/* Cards */}
@@ -208,18 +224,30 @@ export default function SauceTab() {
                       {sauce.tags.map(tag => <span key={tag} style={{ padding: '4px 10px', borderRadius: 7, background: `${sauce.accent}18`, border: `1px solid ${sauce.accent}35`, fontSize: 10, fontWeight: 700, color: sauce.accent, letterSpacing: '0.05em' }}>{tag}</span>)}
                     </div>
                     <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 16 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
-                      {[
-                        { label: 'WHOLESALE', value: `$${sauce.wholesale.toFixed(2)}`, color: sauce.accent },
-                        { label: 'RETAIL', value: `$${sauce.retail.toFixed(2)}`, color: 'rgba(255,255,255,0.82)' },
-                        { label: 'SACHET WS', value: `$${sauce.sachetWholesale.toFixed(2)}`, color: '#27C96A' },
-                      ].map(item => (
-                        <div key={item.label} style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.16em', marginBottom: 4, fontFamily: 'Work Sans, sans-serif', textTransform: 'uppercase' }}>{item.label}</div>
-                          <div style={{ fontSize: 22, fontWeight: 900, color: item.color, fontFamily: 'Impact, sans-serif', letterSpacing: '0.01em' }}>{item.value}</div>
+                    {/* Pricing — switches per view */}
+                    {(() => {
+                      const items = activeView === 'bottle'
+                        ? [
+                            { label: 'WHOLESALE', value: `$${sauce.wholesale.toFixed(2)}`,       color: sauce.accent },
+                            { label: 'RETAIL',    value: `$${sauce.retail.toFixed(2)}`,           color: 'rgba(255,255,255,0.82)' },
+                            { label: 'MIN ORDER', value: `${sauce.wholesaleMin || 12} units`,      color: '#27C96A' },
+                          ]
+                        : [
+                            { label: 'WHOLESALE', value: `$${sauce.sachetWholesale.toFixed(2)}`, color: sauce.accent },
+                            { label: 'RETAIL',    value: `$${(sauce.sachetRetail || 4).toFixed(2)}`, color: 'rgba(255,255,255,0.82)' },
+                            { label: 'MIN ORDER', value: `${sauce.sachetMin || 20} units`,         color: '#27C96A' },
+                          ]
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                          {items.map(item => (
+                            <div key={item.label} style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.16em', marginBottom: 4, fontFamily: 'Work Sans, sans-serif', textTransform: 'uppercase' }}>{item.label}</div>
+                              <div style={{ fontSize: 22, fontWeight: 900, color: item.color, fontFamily: 'Impact, sans-serif', letterSpacing: '0.01em' }}>{item.value}</div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })()}
                     <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 16 }} />
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.22em', marginBottom: 10, fontFamily: 'Work Sans, sans-serif', textTransform: 'uppercase' }}>Pairs Perfectly With</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
@@ -235,7 +263,7 @@ export default function SauceTab() {
               </TiltCard>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-                {sauce.facts.map(f => (
+                {(activeView === 'bottle' ? sauce.facts : (sauce.sachetFacts || sauce.facts)).map(f => (
                   <div key={f.label} style={{ padding: '10px 8px', textAlign: 'center', background: 'rgba(6,6,6,0.65)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
                     <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.14em', marginBottom: 3, fontFamily: 'Work Sans, sans-serif', textTransform: 'uppercase' }}>{f.label}</div>
                     <div style={{ fontSize: 15, fontWeight: 900, color: 'rgba(255,255,255,0.78)', fontFamily: 'Impact, sans-serif', letterSpacing: '0.02em' }}>{f.value}</div>

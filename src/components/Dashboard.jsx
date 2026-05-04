@@ -4,12 +4,14 @@ import SauceTab from './tabs/SauceTab'
 import OrderTab from './tabs/OrderTab'
 import ConnectTab from './tabs/ConnectTab'
 import StatsTab from './tabs/StatsTab'
+import HandshakeTab from './tabs/HandshakeTab'
 
 const TABS = [
   { id: 'sauce',   label: 'The Sauce', icon: '🔥' },
   { id: 'order',   label: 'Order',     icon: '💰' },
-  { id: 'connect', label: 'Connect',   icon: '🤝' },
-  { id: 'stats',   label: 'My Stats',  icon: '📊' },
+  { id: 'connect',   label: 'Connect',   icon: '🤝' },
+  { id: 'handshake', label: 'Handshake', icon: '💸' },
+  { id: 'stats',     label: 'My Stats',  icon: '📊' },
 ]
 
 export default function Dashboard({ staff, onLogout }) {
@@ -62,6 +64,7 @@ export default function Dashboard({ staff, onLogout }) {
             {tab === 'sauce'   && <SauceTab />}
             {tab === 'order'   && <OrderTab staff={staff} onOrderSaved={handleOrderSaved} />}
             {tab === 'connect' && <ConnectTab staff={staff} onLeadSaved={handleLeadSaved} />}
+            {tab === 'handshake' && <HandshakeTab staff={staff} />}
             {tab === 'stats'   && <StatsTab staff={staff} orders={orders} leads={leads} onLogout={onLogout} />}
           </motion.div>
         </AnimatePresence>

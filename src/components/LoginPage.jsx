@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import StaffBubble from './StaffBubble'
 import PasscodeEntry from './PasscodeEntry'
-import { STAFF, BOOTH } from '../config/staff'
+import { STAFF, ADMINS, BOOTH } from '../config/staff'
 
 // Update this to your background image filename in /public/
 const BG_IMAGE = '/background.png'
@@ -21,7 +21,8 @@ function Logo() {
 
 export default function LoginPage({ onLogin }) {
   const [selectedStaff, setSelectedStaff] = useState(null)
-  const [showPasscode, setShowPasscode] = useState(false)
+  const [showPasscode, setShowPasscode]   = useState(false)
+
 
   const handleBubbleSelect = (staff) => {
     setSelectedStaff(staff)
@@ -31,7 +32,10 @@ export default function LoginPage({ onLogin }) {
   const handleBack = () => {
     setShowPasscode(false)
     setSelectedStaff(null)
+
   }
+
+
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#0A0A0A]">
@@ -98,16 +102,22 @@ export default function LoginPage({ onLogin }) {
               Who's running the booth?
             </motion.p>
 
-            {/* Bubble field */}
+
+
+            {/* Bubble field — staff + admins */}
             <div className="relative flex-1 w-full">
-              {STAFF.map((staff, i) => (
+              {[...STAFF, ...ADMINS].map((person, i) => (
                 <StaffBubble
-                  key={staff.id}
-                  staff={staff}
+                  key={person.id}
+                  staff={person}
                   index={i}
-                  onSelect={handleBubbleSelect}
+                  onSelect={(p) => {
+                    setSelectedStaff(p)
+                    setTimeout(() => setShowPasscode(true), 420)
+                  }}
                   animDelay={0.15 + i * 0.1}
                   bgImageUrl={BG_IMAGE}
+                  isAdmin={person.role === 'admin'}
                 />
               ))}
             </div>
@@ -148,7 +158,7 @@ export default function LoginPage({ onLogin }) {
             >
               <PasscodeEntry
                 staff={selectedStaff}
-                onSuccess={onLogin}
+                onSuccess={(staff) => onLogin({ ...staff, isAdmin: staff.role === 'admin' })}
                 onBack={handleBack}
               />
             </div>

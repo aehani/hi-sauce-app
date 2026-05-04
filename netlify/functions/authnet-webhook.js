@@ -1,7 +1,7 @@
 // Payment confirmation webhook
 // Handles both MX Merchant and Authorize.net notifications
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   console.log('Webhook received:', event.httpMethod)
   console.log('Body:', event.body?.slice(0, 500))
 

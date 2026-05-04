@@ -1,7 +1,7 @@
 // Sends a payment receipt email after successful payment
 // Handles all three payment plans: 50/50 deposit, full, custom deposit
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
   }

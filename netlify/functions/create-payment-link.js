@@ -2,7 +2,7 @@
 // No API call needed per order — just build the URL with query params
 // The Link2Pay device was already created: 683894b5-9575-4711-b070-45587d67cda6
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
   }

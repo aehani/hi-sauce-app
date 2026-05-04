@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import QRCode from 'qrcode'
 import { SAUCES } from '../../config/products'
 import { saveOrder, subscribeToPayment, pollPaymentStatus } from '../../lib/supabase'
 
@@ -30,11 +31,15 @@ export default function OrderTab({ staff }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentPlan, setPaymentPlan]           = useState(null) // '50-50' | 'full' | 'custom'
   const [customDepositPct, setCustomDepositPct] = useState('25')
+  const [qrDataUrl, setQrDataUrl]           = useState(null)
+  const [showPhysicalConfirm, setShowPhysicalConfirm] = useState(false)
+  const [physicalLoading, setPhysicalLoading]         = useState(false)
   const [showDiscount, setShowDiscount] = useState(false)
   const [discountType, setDiscountType] = useState('%')
   const [discountValue, setDiscountValue] = useState('')
   const [shipping, setShipping]         = useState('0.00')
-  const cleanupRef = useRef(null)
+  const cleanupRef   = useRef(null)
+  const orderDataRef  = useRef(null)
 
   useEffect(() => () => cleanupRef.current?.(), [])
 
@@ -92,10 +97,68 @@ export default function OrderTab({ staff }) {
     finally { setEmailSending(false) }
   }
 
-  const startPolling = (oid) => {
-    const unsub = subscribeToPayment(oid, () => { setPayStatus('paid'); cleanupRef.current?.() })
-    pollPaymentStatus(oid, () => { setPayStatus('paid'); cleanupRef.current?.() }).then(stop => { cleanupRef.current = () => { unsub(); stop() } })
+  const sendReceiptEmail = async (orderData) => {
+    try {
+      await fetch('/.netlify/functions/send-receipt-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buyerEmail:       orderData.buyer.email,
+          buyerName:        orderData.buyer.name,
+          storeName:        orderData.buyer.store,
+          orderId:          orderData.orderId,
+          items:            orderData.items,
+          subtotal:         orderData.subtotal,
+          discountAmt:      orderData.discountAmt,
+          shippingAmt:      orderData.shippingAmt,
+          total:            orderData.total,
+          paymentPlan:      orderData.paymentPlan,
+          customDepositPct: orderData.customDepositPct,
+          amountCharged:    orderData.amountCharged,
+          transactionId:    orderData.transactionId,
+        }),
+      })
+    } catch (err) { console.error('Receipt email error:', err) }
+  }
+
+  // Generate QR code when payment URL is available
+  useEffect(() => {
+    if (!paymentUrl) return
+    QRCode.toDataURL(paymentUrl, {
+      width: 200, margin: 1,
+      color: { dark: '#ffffff', light: '#00000000' },
+    }).then(setQrDataUrl).catch(console.error)
+  }, [paymentUrl])
+
+  // Mark order as physically charged — updates Supabase and sends receipt
+  const markPhysicallyCharged = async (orderData) => {
+    setPhysicalLoading(true)
+    try {
+      const { supabase } = await import('../../lib/supabase')
+      await supabase
+        .from('orders')
+        .update({ payment_status: 'paid', paid_at: new Date().toISOString(), transaction_id: 'PHYSICAL-MX' })
+        .eq('order_id', orderData.orderId)
+      setPayStatus('paid')
+      setShowPhysicalConfirm(false)
+      sendReceiptEmail({ ...orderData, transactionId: 'Physical — MX Merchant Reader' })
+    } catch (err) {
+      console.error('Physical charge error:', err)
+      alert('Error updating order: ' + err.message)
+    } finally { setPhysicalLoading(false) }
+  }
+
+  const startPolling = (oid, orderData) => {
+    const onPaid = (data) => {
+      setPayStatus('paid')
+      cleanupRef.current?.()
+      sendReceiptEmail({ ...orderData, transactionId: data?.transaction_id })
+    }
+    const unsub = subscribeToPayment(oid, onPaid)
+    pollPaymentStatus(oid, onPaid).then(stop => { cleanupRef.current = () => { unsub(); stop() } })
     cleanupRef.current = unsub
+    // Store orderData for physical charge button
+    orderDataRef.current = orderData
   }
 
   const submitOrder = async () => {
@@ -108,7 +171,13 @@ export default function OrderTab({ staff }) {
         const res  = await fetch('/.netlify/functions/create-payment-link', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({orderId,amount:chargeNow,buyer:orderPayload.buyer}) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error||'Failed to create payment link')
-        setPaymentUrl(data.paymentUrl); setPayStatus('waiting'); setStep('waiting'); startPolling(orderId)
+        setPaymentUrl(data.paymentUrl); setPayStatus('waiting'); setStep('waiting')
+        startPolling(orderId, {
+          ...orderPayload,
+          paymentPlan,
+          customDepositPct: parseFloat(customDepositPct) || 0,
+          amountCharged:    depositAmount,
+        })
       } else { setStep('done') }
     } catch (err) { console.error('Order error:', err); setError(err.message||'Something went wrong.') }
     finally { setLoading(false) }
@@ -118,7 +187,7 @@ export default function OrderTab({ staff }) {
     cleanupRef.current?.()
     setCart({}); setBuyer({store:'',name:'',email:'',phone:'',address:'',city:'',state:'',zip:'',fulfillment:'ship'})
     setPayMethod(null); setStep('build'); setError(null); setPaymentUrl(null); setPayStatus('idle')
-    setEmailSent(false); setEmailSending(false); setShowDiscount(false); setDiscountValue(''); setDiscountType('%'); setShipping('0.00'); setShowPaymentModal(false); setPaymentPlan(null); setCustomDepositPct('25')
+    setEmailSent(false); setEmailSending(false); setShowDiscount(false); setDiscountValue(''); setDiscountType('%'); setShipping('0.00'); setShowPaymentModal(false); setPaymentPlan(null); setCustomDepositPct('25'); setQrDataUrl(null); setShowPhysicalConfirm(false)
   }
 
   // WAITING
@@ -138,20 +207,74 @@ export default function OrderTab({ staff }) {
             <div style={{position:'absolute',inset:0,borderRadius:'50%',background:'rgba(232,52,28,0.2)',animation:'ping 1.5s ease-in-out infinite'}}/>
             <div style={{position:'relative',width:80,height:80,borderRadius:'50%',background:'rgba(232,52,28,0.15)',border:'2px solid #E8341C',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>💳</div>
           </div>
-          <h2 style={{...hdg,fontSize:28,marginBottom:8}}>Waiting for Payment</h2>
-          <p style={{color:'rgba(255,255,255,0.45)',fontSize:14,marginBottom:24,fontFamily:'Work Sans, sans-serif'}}>Send link to <strong style={{color:'#fff'}}>{buyer.name}</strong> — <strong style={{color:'#E8341C'}}>{fmtN(total)}</strong></p>
-          <div style={{width:'100%',maxWidth:380,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:16,padding:20,marginBottom:20}}>
-            <p style={{...lbl,marginBottom:14}}>Payment Link</p>
-            <button onClick={()=>{const a=document.createElement('a');a.href=paymentUrl;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a)}}
-              style={{width:'100%',padding:'14px',background:'#E8341C',border:'none',borderRadius:12,color:'#fff',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'Impact, sans-serif',letterSpacing:'0.06em',marginBottom:10}}>🔗 OPEN PAYMENT PAGE</button>
-            <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>navigator.clipboard.writeText(paymentUrl)} style={{flex:1,padding:11,background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:10,color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>📋 Copy</button>
-              {buyer.email&&<button onClick={sendPaymentEmail} disabled={emailSending||emailSent} style={{flex:1,padding:11,background:emailSent?'rgba(39,201,106,0.15)':'rgba(255,255,255,0.08)',border:`1px solid ${emailSent?'rgba(39,201,106,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:10,color:emailSent?'#27C96A':'#fff',fontSize:11,fontWeight:700,cursor:emailSent||emailSending?'default':'pointer',fontFamily:'Work Sans, sans-serif',opacity:emailSending?0.6:1}}>{emailSending?'...':emailSent?'✓ Sent!':'✉️ Email'}</button>}
-              {buyer.phone&&<button onClick={()=>window.open(`sms:${buyer.phone}?body=Hi ${buyer.name}! Complete your Hi! Sauce payment of ${fmtN(total)}: ${paymentUrl}`,'_blank')} style={{flex:1,padding:11,background:'rgba(232,52,28,0.15)',border:'1px solid rgba(232,52,28,0.4)',borderRadius:10,color:'#E8341C',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>💬 SMS</button>}
+          <h2 style={{...hdg,fontSize:28,marginBottom:6}}>Waiting for Payment</h2>
+          <p style={{color:'rgba(255,255,255,0.45)',fontSize:14,marginBottom:20,fontFamily:'Work Sans, sans-serif'}}>
+            {buyer.name} — <strong style={{color:'#E8341C'}}>{fmtN(depositAmount)}</strong>
+          </p>
+
+          <div style={{width:'100%',maxWidth:460,display:'flex',flexDirection:'column',gap:12}}>
+
+            {/* Payment link card */}
+            <div style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:18,padding:18}}>
+              <p style={{...lbl,marginBottom:12}}>Send Payment Link</p>
+
+              {/* QR code + actions side by side */}
+              <div style={{display:'flex',gap:16,alignItems:'flex-start'}}>
+                {/* QR Code */}
+                {qrDataUrl && (
+                  <div style={{flexShrink:0,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:14,padding:10,display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+                    <img src={qrDataUrl} alt="Payment QR" style={{width:110,height:110,borderRadius:8}}/>
+                    <span style={{fontSize:10,color:'rgba(255,255,255,0.3)',fontFamily:'Work Sans, sans-serif',letterSpacing:'0.08em'}}>SCAN TO PAY</span>
+                  </div>
+                )}
+                {/* Actions */}
+                <div style={{flex:1,display:'flex',flexDirection:'column',gap:8}}>
+                  <button onClick={()=>{const a=document.createElement('a');a.href=paymentUrl;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();document.body.removeChild(a)}}
+                    style={{width:'100%',padding:'12px',background:'#E8341C',border:'none',borderRadius:11,color:'#fff',fontSize:13,fontWeight:900,cursor:'pointer',fontFamily:'Impact, sans-serif',letterSpacing:'0.06em'}}>🔗 OPEN LINK</button>
+                  <div style={{display:'flex',gap:7}}>
+                    <button onClick={()=>navigator.clipboard.writeText(paymentUrl)} style={{flex:1,padding:10,background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:9,color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>📋 Copy</button>
+                    {buyer.email&&<button onClick={sendPaymentEmail} disabled={emailSending||emailSent}
+                      style={{flex:1,padding:10,background:emailSent?'rgba(39,201,106,0.15)':'rgba(255,255,255,0.08)',border:`1px solid ${emailSent?'rgba(39,201,106,0.4)':'rgba(255,255,255,0.1)'}`,borderRadius:9,color:emailSent?'#27C96A':'#fff',fontSize:11,fontWeight:700,cursor:emailSent||emailSending?'default':'pointer',fontFamily:'Work Sans, sans-serif',opacity:emailSending?0.6:1}}>
+                      {emailSending?'...':emailSent?'✓ Sent!':'✉️ Email'}
+                    </button>}
+                    {buyer.phone&&<button onClick={()=>window.open(`sms:${buyer.phone}?body=Hi ${buyer.name}! Complete your Hi! Sauce payment of ${fmtN(depositAmount)}: ${paymentUrl}`,'_blank')}
+                      style={{flex:1,padding:10,background:'rgba(232,52,28,0.15)',border:'1px solid rgba(232,52,28,0.4)',borderRadius:9,color:'#E8341C',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>💬 SMS</button>}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Physical charge card */}
+            <div style={{background:'rgba(39,201,106,0.07)',border:'1px solid rgba(39,201,106,0.25)',borderRadius:18,padding:18}}>
+              <p style={{...lbl,color:'rgba(39,201,106,0.6)',marginBottom:8}}>Charge with Card Reader</p>
+              <p style={{fontSize:12,color:'rgba(255,255,255,0.4)',fontFamily:'Work Sans, sans-serif',margin:'0 0 12px',lineHeight:1.5}}>
+                Use the MX Merchant app + CX3 reader to charge in person, then confirm below.
+              </p>
+              {!showPhysicalConfirm ? (
+                <button onClick={()=>setShowPhysicalConfirm(true)}
+                  style={{width:'100%',padding:'13px',background:'rgba(39,201,106,0.15)',border:'2px solid rgba(39,201,106,0.5)',borderRadius:11,color:'#27C96A',fontSize:14,fontWeight:900,cursor:'pointer',fontFamily:'Impact, sans-serif',letterSpacing:'0.06em'}}>
+                  ✓ MARK AS PHYSICALLY CHARGED
+                </button>
+              ) : (
+                <div style={{background:'rgba(39,201,106,0.1)',border:'1px solid rgba(39,201,106,0.35)',borderRadius:12,padding:14}}>
+                  <p style={{fontSize:13,fontWeight:700,color:'#27C96A',fontFamily:'Work Sans, sans-serif',margin:'0 0 12px'}}>
+                    Confirm {fmtN(depositAmount)} was charged via card reader?
+                  </p>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={()=>setShowPhysicalConfirm(false)}
+                      style={{flex:1,padding:'10px',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',borderRadius:9,color:'rgba(255,255,255,0.5)',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>Cancel</button>
+                    <button onClick={()=>markPhysicallyCharged(orderDataRef.current)} disabled={physicalLoading}
+                      style={{flex:2,padding:'10px',background:'#27C96A',border:'none',borderRadius:9,color:'#fff',fontSize:14,fontWeight:900,cursor:physicalLoading?'wait':'pointer',fontFamily:'Impact, sans-serif',letterSpacing:'0.06em',opacity:physicalLoading?0.7:1}}>
+                      {physicalLoading ? 'CONFIRMING...' : '✓ CONFIRM PAYMENT'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p style={{color:'rgba(255,255,255,0.18)',fontSize:11,fontFamily:'Work Sans, sans-serif',textAlign:'center'}}>Screen updates automatically when online payment is received</p>
+            <button onClick={reset} style={{padding:'8px 24px',background:'transparent',border:'1px solid rgba(255,255,255,0.12)',borderRadius:9,color:'rgba(255,255,255,0.3)',fontSize:12,cursor:'pointer',fontFamily:'Work Sans, sans-serif',alignSelf:'center'}}>Cancel Order</button>
           </div>
-          <p style={{color:'rgba(255,255,255,0.2)',fontSize:12,fontFamily:'Work Sans, sans-serif',marginBottom:20}}>Screen updates automatically when payment is received</p>
-          <button onClick={reset} style={{padding:'10px 28px',background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:10,color:'rgba(255,255,255,0.4)',fontSize:12,cursor:'pointer',fontFamily:'Work Sans, sans-serif'}}>Cancel</button>
         </>
       )}
       <style>{`@keyframes ping{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.3);opacity:0}}`}</style>

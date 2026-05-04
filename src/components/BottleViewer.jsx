@@ -108,36 +108,12 @@ function SceneContent({ sauce, activeTab }) {
   )
 }
 
-export default function BottleViewer({ sauce, onClick }) {
-  const [activeTab, setActiveTab] = useState('bottle')
-  useEffect(() => { setActiveTab('bottle') }, [sauce?.id])
-
-  const hasSachet = !!sauce.sachetGlb
+export default function BottleViewer({ sauce, onClick, activeTab = 'bottle' }) {
+  // activeTab is now controlled by parent (SauceTab) — no internal state needed
+  // The toggle lives in SauceTab so one pill controls both the 3D view and the info cards
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', background: 'transparent', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Tab pills */}
-      {hasSachet && (
-        <div style={{ display: 'flex', gap: 8, padding: '10px 14px 0', position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
-          {[{ id: 'bottle', label: '🍶 Bottle' }, { id: 'sachet', label: '📦 Sachet' }].map(tab => (
-            <button
-              key={tab.id}
-              onClick={(e) => { e.stopPropagation(); setActiveTab(tab.id) }}
-              style={{
-                padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                fontFamily: 'Work Sans, sans-serif', fontSize: 11, fontWeight: 700,
-                transition: 'all 0.22s',
-                background: activeTab === tab.id ? sauce.accent : 'rgba(0,0,0,0.55)',
-                color: activeTab === tab.id ? '#fff' : 'rgba(255,255,255,0.45)',
-                backdropFilter: 'blur(10px)',
-                boxShadow: activeTab === tab.id ? `0 0 14px ${sauce.accent}66` : '0 2px 8px rgba(0,0,0,0.4)',
-                outline: `1px solid ${activeTab === tab.id ? sauce.accent : 'rgba(255,255,255,0.1)'}`,
-              }}
-            >{tab.label}</button>
-          ))}
-        </div>
-      )}
 
       {/* Single Canvas — no tab switching = no context loss */}
       <div style={{ flex: 1, position: 'relative', cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>

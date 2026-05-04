@@ -160,17 +160,18 @@ export default function SauceTab() {
             <div style={{ position: 'relative', height: '42%', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${sauce.accent}30 0%, transparent 70%)`, filter: 'blur(28px)', pointerEvents: 'none', zIndex: 1 }} />
               <div style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
-                <BottleViewer sauce={sauce} onClick={() => setModalSauce(sauce)} />
+                <BottleViewer sauce={sauce} onClick={() => setModalSauce(sauce)} activeTab={activeView} />
               </div>
               <Chip label="THC / SERVE" value={sauce.thc} color={sauce.accent} style={{ position: 'absolute', top: 14, left: 14, zIndex: 10 }} />
-              {/* Bottle / Sachet tab switcher */}
-              <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, display: 'flex', gap: 3, background: 'rgba(6,6,6,0.78)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: 3, backdropFilter: 'blur(12px)' }}>
+              {/* Single centered toggle — controls both 3D view and info cards */}
+              <div style={{ position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: 3, background: 'rgba(6,6,6,0.82)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 22, padding: 3, backdropFilter: 'blur(16px)' }}>
                 {[{ id: 'bottle', label: '🍶 Bottle' }, { id: 'sachet', label: '📦 Sachet' }].map(v => (
                   <button key={v.id} onClick={(e) => { e.stopPropagation(); setActiveView(v.id) }}
-                    style={{ padding: '5px 11px', borderRadius: 16, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: 'Work Sans, sans-serif', transition: 'all 0.2s',
+                    style={{ padding: '7px 18px', borderRadius: 18, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'Work Sans, sans-serif', transition: 'all 0.2s',
                       background: activeView === v.id ? sauce.accent : 'transparent',
-                      color: activeView === v.id ? '#fff' : 'rgba(255,255,255,0.38)',
-                      boxShadow: activeView === v.id ? `0 0 10px ${sauce.accent}55` : 'none',
+                      color: activeView === v.id ? '#fff' : 'rgba(255,255,255,0.4)',
+                      boxShadow: activeView === v.id ? `0 0 12px ${sauce.accent}55` : 'none',
+                      letterSpacing: '0.02em',
                     }}>{v.label}</button>
                 ))}
               </div>

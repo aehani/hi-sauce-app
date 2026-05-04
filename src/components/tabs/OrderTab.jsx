@@ -89,7 +89,7 @@ export default function OrderTab({ staff }) {
   const sendPaymentEmail = async () => {
     setEmailSending(true)
     try {
-      const res  = await fetch('/.netlify/functions/send-payment-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ buyerEmail:buyer.email, buyerName:buyer.name, storeName:buyer.store, orderId, amount:total, paymentUrl }) })
+      const res  = await fetch('/api/send-payment-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ buyerEmail:buyer.email, buyerName:buyer.name, storeName:buyer.store, orderId, amount:total, paymentUrl }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to send email')
       setEmailSent(true)
@@ -99,7 +99,7 @@ export default function OrderTab({ staff }) {
 
   const sendReceiptEmail = async (orderData) => {
     try {
-      await fetch('/.netlify/functions/send-receipt-email', {
+      await fetch('/api/send-receipt-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ export default function OrderTab({ staff }) {
       await saveOrder(orderPayload)
       if (payMethod === 'charge') {
         const chargeNow = paymentPlan === 'full' ? fullAmount : depositAmount
-        const res  = await fetch('/.netlify/functions/create-payment-link', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({orderId,amount:chargeNow,buyer:orderPayload.buyer}) })
+        const res  = await fetch('/api/create-payment-link', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({orderId,amount:chargeNow,buyer:orderPayload.buyer}) })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error||'Failed to create payment link')
         setPaymentUrl(data.paymentUrl); setPayStatus('waiting'); setStep('waiting')

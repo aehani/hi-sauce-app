@@ -1,7 +1,7 @@
 // Netlify function — sends payment link email via Resend (free tier: 3000 emails/month)
 // Sign up at resend.com — it's free and takes 2 minutes
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
   }

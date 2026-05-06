@@ -1,6 +1,6 @@
-// Vercel serverless function — payment confirmation webhook
+// Vercel serverless function — payment confirmation webhook from MX Merchant
 export default async function handler(req, res) {
-  console.log('Webhook received:', req.method)
+  console.log('Webhook received:', req.method, JSON.stringify(req.body || {}).slice(0, 200))
 
   if (req.method === 'GET') {
     return res.status(200).send(`<!DOCTYPE html>
@@ -14,7 +14,7 @@ p{color:rgba(255,255,255,.5);font-size:16px;margin-bottom:32px}
 <body>
   <div style="font-size:64px;margin-bottom:24px">✓</div>
   <h1>Payment Complete!</h1>
-  <p>Your Hi! Sauce order has been received.</p>
+  <p>Your Hi! Sauce order has been received. You can close this window.</p>
   <a href="javascript:window.close()" class="btn">Close Window</a>
 </body>
 </html>`)
@@ -40,10 +40,17 @@ p{color:rgba(255,255,255,.5);font-size:16px;margin-bottom:32px}
   console.log('Payment parsed:', { orderId, transactionId, status })
 
   if (orderId && status === 'paid') {
-    try {
-      const SUPABASE_URL      = process.env.VITE_SUPABASE_URL
-      const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
-      if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    const SUPABASE_URL      = process.env.VITE_SUPABASE_URL
+    const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
+    const RESEND_API_KEY    = process.env.RESEND_API_KEY
+    const SITE_URL          = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://hi-sauce-app.vercel.app'
+
+    // 1. Update Supabase order to paid
+    let orderData = null
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      try {
         await fetch(`${SUPABASE_URL}/rest/v1/orders?order_id=eq.${orderId}`, {
           method: 'PATCH',
           headers: {
@@ -52,12 +59,54 @@ p{color:rgba(255,255,255,.5);font-size:16px;margin-bottom:32px}
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             'Prefer':        'return=minimal',
           },
-          body: JSON.stringify({ payment_status: 'paid', transaction_id: transactionId, paid_at: new Date().toISOString() })
+          body: JSON.stringify({
+            payment_status: 'paid',
+            transaction_id: transactionId,
+            paid_at:        new Date().toISOString(),
+          })
         })
         console.log('Supabase updated for order:', orderId)
+
+        // Fetch the order details for the receipt email
+        const getRes = await fetch(`${SUPABASE_URL}/rest/v1/orders?order_id=eq.${orderId}&select=*`, {
+          headers: {
+            'apikey':        SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          }
+        })
+        const orders = await getRes.json()
+        orderData = orders?.[0]
+      } catch (err) {
+        console.error('Supabase error:', err)
       }
-    } catch (err) {
-      console.error('Supabase update error:', err)
+    }
+
+    // 2. Send receipt email if we have buyer email and order data
+    if (RESEND_API_KEY && orderData?.buyer_email) {
+      try {
+        const receiptRes = await fetch(`${SITE_URL}/api/send-receipt-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            buyerEmail:      orderData.buyer_email,
+            buyerName:       orderData.buyer_name,
+            storeName:       orderData.store_name,
+            orderId:         orderData.order_id,
+            items:           orderData.items || [],
+            subtotal:        orderData.subtotal,
+            discountAmt:     0,
+            shippingAmt:     0,
+            total:           orderData.subtotal,
+            paymentPlan:     orderData.pay_method || 'charge',
+            customDepositPct: 0,
+            amountCharged:   orderData.subtotal,
+            transactionId,
+          }),
+        })
+        console.log('Receipt email sent:', receiptRes.status)
+      } catch (err) {
+        console.error('Receipt email error:', err)
+      }
     }
   }
 

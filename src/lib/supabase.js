@@ -64,3 +64,27 @@ export async function pollPaymentStatus(orderId, onPaid, intervalMs = 5000) {
   }, intervalMs)
   return () => clearInterval(id)
 }
+
+export async function saveLead(lead) {
+  const { data, error } = await supabase
+    .from('leads')
+    .insert([{
+      staff_name:  lead.staff,
+      name:        lead.name,
+      store_name:  lead.store,
+      email:       lead.email,
+      phone:       lead.phone,
+      locations:   lead.locations,
+      states:      lead.states,
+      volume:      lead.volume,
+      infused:     lead.infused,
+      brands:      lead.brands,
+      notes:       lead.notes,
+      created_at:  lead.timestamp,
+    }])
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { saveLead } from '../../lib/supabase'
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"]
 
@@ -30,11 +31,25 @@ export default function ConnectTab({ staff, onLeadSaved }) {
 
   const canSubmit = form.name && form.store && form.email && form.phone
 
-  const submit = () => {
-    if (!canSubmit) return
-    onLeadSaved?.({ ...form, staff: staff.name, timestamp: new Date().toISOString() })
-    setSaved(true)
-    setTimeout(() => { setSaved(false); setForm({ ...empty }); setStatesOpen(false) }, 2500)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+
+  const submit = async () => {
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const lead = { ...form, staff: staff.name, timestamp: new Date().toISOString() }
+      await saveLead(lead)
+      onLeadSaved?.(lead)
+      setSaved(true)
+      setTimeout(() => { setSaved(false); setForm({ ...empty }); setStatesOpen(false) }, 2500)
+    } catch (err) {
+      console.error('Lead save error:', err)
+      setSubmitError('Failed to save — please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (saved) return (
@@ -133,14 +148,20 @@ export default function ConnectTab({ staff, onLeadSaved }) {
           <textarea placeholder="Loves the Buffalo, wants samples first, runs 3 shops in AZ..." value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} rows={3} style={{...inputStyle, resize:'none'}} />
         </div>
 
-        <button onClick={submit} disabled={!canSubmit} style={{
+        {submitError && (
+          <div style={{ background:'rgba(232,52,28,0.15)', border:'1px solid rgba(232,52,28,0.4)', borderRadius:12, padding:'12px 16px', color:'#E8341C', fontSize:13, fontFamily:'DM Sans,sans-serif' }}>
+            ⚠️ {submitError}
+          </div>
+        )}
+
+        <button onClick={submit} disabled={!canSubmit || submitting} style={{
           width:'100%', padding:18,
-          background: canSubmit?'#E8341C':'rgba(255,255,255,0.08)',
+          background: canSubmit && !submitting ? '#E8341C' : 'rgba(255,255,255,0.08)',
           border:'none', borderRadius:14, color:'#fff',
-          fontSize:16, fontWeight:800, cursor:canSubmit?'pointer':'not-allowed',
-          fontFamily:'Syne,sans-serif', opacity:canSubmit?1:0.4, marginTop:4,
+          fontSize:16, fontWeight:800, cursor: canSubmit && !submitting ? 'pointer' : 'not-allowed',
+          fontFamily:'Syne,sans-serif', opacity: canSubmit && !submitting ? 1 : 0.4, marginTop:4,
         }}>
-          SAVE CONTACT
+          {submitting ? 'SAVING...' : 'SAVE CONTACT'}
         </button>
       </div>
     </div>

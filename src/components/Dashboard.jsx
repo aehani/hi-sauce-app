@@ -65,7 +65,7 @@ export default function Dashboard({ staff, onLogout }) {
             {tab === 'order'   && <OrderTab staff={staff} onOrderSaved={handleOrderSaved} />}
             {tab === 'connect' && <ConnectTab staff={staff} onLeadSaved={handleLeadSaved} />}
             {tab === 'handshake' && <HandshakeTab staff={staff} />}
-            {tab === 'stats'   && <StatsTab staff={staff} orders={orders} leads={leads} onLogout={onLogout} />}
+            {tab === 'stats'   && <StatsTab staff={staff} onLogout={onLogout} />}
           </motion.div>
         </AnimatePresence>
       </div>

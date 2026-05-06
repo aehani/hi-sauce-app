@@ -24,6 +24,8 @@ export default async function handler(req, res) {
     Memo:         `Hi! Sauce Order ${orderId}`,
     ShowMemo:     '1',
     PONumber:     orderId,
+    InvoiceNum:   orderId,
+    ReferenceNum: orderId,
   })
 
   if (buyer?.address) params.append('Address', buyer.address)

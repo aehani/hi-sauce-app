@@ -23,9 +23,63 @@ function EditOrderModal({ order, onClose, onSaved }) {
 
   const save = async () => {
     setSaving(true)
-    const { error } = await supabase.from('orders').update({ payment_status: status, notes }).eq('id', order.id)
-    if (!error) { onSaved(); onClose() }
-    setSaving(false)
+    try {
+      // Update by order_id (text field) instead of id (uuid) for reliability
+      const updateData = {
+        payment_status: status,
+        notes,
+        ...(status === 'paid' && order.payment_status !== 'paid' ? { paid_at: new Date().toISOString(), transaction_id: 'MANUAL-ADMIN' } : {}),
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('order_id', order.order_id)
+
+      if (error) {
+        console.error('Save error:', error)
+        alert('Save failed: ' + error.message)
+        setSaving(false)
+        return
+      }
+
+      // Send receipt email if marking as paid for the first time
+      if (status === 'paid' && order.payment_status !== 'paid' && order.buyer_email) {
+        try {
+          await fetch('/api/send-receipt-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              buyerEmail:      order.buyer_email,
+              buyerName:       order.buyer_name,
+              storeName:       order.store_name,
+              orderId:         order.order_id,
+              items:           order.items || [],
+              subtotal:        parseFloat(order.subtotal || 0),
+              discountAmt:     0,
+              shippingAmt:     0,
+              total:           parseFloat(order.subtotal || 0),
+              paymentPlan:     'charge',
+              customDepositPct: 0,
+              amountCharged:   parseFloat(order.subtotal || 0),
+              transactionId:   'Manual — Admin',
+            }),
+          })
+          console.log('Receipt email sent for order:', order.order_id)
+        } catch (emailErr) {
+          console.error('Receipt email failed:', emailErr)
+          // Don't block save if email fails
+        }
+      }
+
+      onSaved()
+      onClose()
+    } catch (err) {
+      console.error('Unexpected error:', err)
+      alert('Something went wrong: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

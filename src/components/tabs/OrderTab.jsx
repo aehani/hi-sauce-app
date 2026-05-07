@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import QRCode from 'qrcode'
-import { SAUCES } from '../../config/products'
+import { SAUCES, MINI_SHOTS } from '../../config/products'
 import { saveOrder, subscribeToPayment, pollPaymentStatus } from '../../lib/supabase'
 
 const fmtN = (n) => `$${parseFloat(n || 0).toFixed(2)}`
@@ -61,6 +61,12 @@ export default function OrderTab({ staff }) {
 
   const cartItems = Object.entries(cart).map(([key, qty]) => {
     const [id, type] = key.split('-')
+    // Check mini shots first
+    if (type === 'mini') {
+      const mini = MINI_SHOTS.find(m => m.id === id)
+      if (!mini) return null
+      return { key, sauce: mini, type: 'mini shot', qty, price: mini.wholesale }
+    }
     const sauce = SAUCES.find(s => s.id === id)
     if (!sauce) return null
     return { key, sauce, type, qty, price: type === 'bottle' ? sauce.wholesale : sauce.sachetWholesale }
@@ -307,7 +313,10 @@ export default function OrderTab({ staff }) {
         <p style={{fontSize:13,color:'rgba(255,255,255,0.4)',marginTop:3,fontFamily:'Work Sans, sans-serif'}}>{buyer.name} · {buyer.email} · {buyer.phone}</p>
       </div>
       <div style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.09)',borderRadius:18,padding:18,marginBottom:14}}>
-        <p style={lbl}>Order {orderId}</p>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+          <p style={{...lbl,margin:0}}>Order {orderId}</p>
+          <span style={{fontSize:9,fontWeight:700,padding:'3px 10px',borderRadius:6,background:'rgba(59,130,246,0.15)',border:'1px solid rgba(59,130,246,0.35)',color:'#3B82F6',letterSpacing:'0.08em'}}>SHIPS 6–8 WEEKS</span>
+        </div>
         {cartItems.map(i=>(
           <div key={i.key} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
             <span style={{fontSize:13,color:'rgba(255,255,255,0.65)',fontFamily:'Work Sans, sans-serif'}}>{i.sauce.name} {i.type} × {i.qty}</span>
@@ -573,9 +582,33 @@ export default function OrderTab({ staff }) {
             )
           })}
         </div>
+
+        {/* Divider */}
+        <div style={{height:1,background:'rgba(255,255,255,0.07)',margin:'16px 0'}}/>
+
+        {/* Mini Shot Bottles — inside same card */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <p style={{...lbl,margin:0}}>Mini Shot Bottles — {fmtN(MINI_SHOTS[0]?.wholesale||6)} ea</p>
+          <span style={{fontSize:9,fontWeight:700,padding:'3px 8px',borderRadius:6,background:'rgba(59,130,246,0.15)',border:'1px solid rgba(59,130,246,0.35)',color:'#3B82F6',letterSpacing:'0.08em',fontFamily:'Work Sans, sans-serif'}}>SHIPS 6–8 WEEKS</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+          {MINI_SHOTS.map(m=>{
+            const qty=cart[m.id+'-mini']||0
+            return(
+              <div key={m.id} style={{padding:'10px 6px',borderRadius:12,textAlign:'center',background:qty>0?'rgba(59,130,246,0.1)':'rgba(255,255,255,0.03)',border:`1px solid ${qty>0?'rgba(59,130,246,0.4)':'rgba(255,255,255,0.07)'}`}}>
+                <div style={{fontSize:14,fontWeight:700,marginTop:4,fontFamily:'Work Sans, sans-serif',color:'rgba(255,255,255,0.75)'}}>{m.shortName}</div>
+                <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',fontFamily:'Work Sans, sans-serif',marginTop:2,lineHeight:1.4}}>WS {fmtN(m.wholesale)} · Retail {fmtN(m.retail)}</div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:8}}>
+                  <button onClick={()=>updateQty(m.id+'-mini',-1)} style={{width:34,height:34,borderRadius:9,background:'rgba(255,255,255,0.08)',border:'none',color:'#fff',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                  <span style={{fontSize:22,fontWeight:900,minWidth:26,textAlign:'center',fontFamily:'Impact, sans-serif',color:qty>0?'#3B82F6':'#fff'}}>{qty}</span>
+                  <button onClick={()=>updateQty(m.id+'-mini',1)} style={{width:34,height:34,borderRadius:9,background:'#3B82F6',border:'none',color:'#fff',fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Floating cart bar */}
       {cartItems.length>0&&(
         <div style={{position:'fixed',bottom:76,left:'50%',transform:'translateX(-50%)',width:'calc(100% - 24px)',maxWidth:680,zIndex:50,background:'rgba(10,10,10,0.97)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:18,padding:'12px 16px',backdropFilter:'blur(24px)',boxShadow:'0 8px 32px rgba(0,0,0,0.6)'}}>
           <div style={{display:'flex',alignItems:'center',gap:16}}>

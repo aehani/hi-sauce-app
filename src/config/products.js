@@ -138,3 +138,9 @@ export const DISPLAY_PRESETS = [
   { id: 'starter', name: 'Starter Pack', desc: '1 Display — 18 Bottles + 60 Sachets', bottles: 18, sachets: 60, multiplier: 1 },
   { id: 'double',  name: 'Double Down',  desc: '2 Displays — 36 Bottles + 120 Sachets', bottles: 36, sachets: 120, multiplier: 2 },
 ]
+
+export const MINI_SHOTS = [
+  { id: 'mini-buffalo', name: 'Hi! Buffalo', shortName: 'Buffalo', emoji: '🐃', wholesale: 6.00, retail: 12.00, format: 'Mini Shot' },
+  { id: 'mini-burn',    name: 'Hi! Burn',    shortName: 'Burn',    emoji: '🔥', wholesale: 6.00, retail: 12.00, format: 'Mini Shot' },
+  { id: 'mini-bbq',     name: 'Hi! BBQ',     shortName: 'BBQ',     emoji: '🍖', wholesale: 6.00, retail: 12.00, format: 'Mini Shot' },
+]

@@ -60,8 +60,11 @@ export default function OrderTab({ staff }) {
   }
 
   const cartItems = Object.entries(cart).map(([key, qty]) => {
-    const [id, type] = key.split('-')
-    // Check mini shots first
+    // Key formats: 'buffalo-bottle', 'buffalo-sachet', 'mini-buffalo-mini'
+    const lastDash = key.lastIndexOf('-')
+    const type     = key.substring(lastDash + 1)   // 'bottle' | 'sachet' | 'mini'
+    const id       = key.substring(0, lastDash)     // 'buffalo' | 'mini-buffalo'
+
     if (type === 'mini') {
       const mini = MINI_SHOTS.find(m => m.id === id)
       if (!mini) return null
@@ -596,6 +599,7 @@ export default function OrderTab({ staff }) {
             const qty=cart[m.id+'-mini']||0
             return(
               <div key={m.id} style={{padding:'10px 6px',borderRadius:12,textAlign:'center',background:qty>0?'rgba(59,130,246,0.1)':'rgba(255,255,255,0.03)',border:`1px solid ${qty>0?'rgba(59,130,246,0.4)':'rgba(255,255,255,0.07)'}`}}>
+                <div style={{fontSize:20}}>{m.emoji}</div>
                 <div style={{fontSize:14,fontWeight:700,marginTop:4,fontFamily:'Work Sans, sans-serif',color:'rgba(255,255,255,0.75)'}}>{m.shortName}</div>
                 <div style={{fontSize:10,color:'rgba(255,255,255,0.35)',fontFamily:'Work Sans, sans-serif',marginTop:2,lineHeight:1.4}}>WS {fmtN(m.wholesale)} · Retail {fmtN(m.retail)}</div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:8}}>
